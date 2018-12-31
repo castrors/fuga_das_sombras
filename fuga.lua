@@ -10,6 +10,7 @@ Estados = {
 Constantes = {
 	
 	VISAO_DO_INIMIGO = 48,
+	TEMPO_PARA_MUDAR_A_TELA = 45,
 
 	Direcao = {
 		CIMA = 1,
@@ -25,6 +26,7 @@ Constantes = {
 	SPRITE_PORTA = 366,
 	SPRITE_INIMIGO = 292,
 	SPRITE_ESPADA = 328,
+	SPRITE_SAIDA = 32,
 	
 	SPRITE_TITULO = 352,
 	SPRITE_ALURA = 416,
@@ -37,8 +39,11 @@ Constantes = {
 	ID_SFX_CHAVE = 0,
 	ID_SFX_PORTA = 1,
 	ID_SFX_INICIO = 2,
+	ID_SFX_ESPADA = 3,
+	ID_SFX_FINAL = 4,
 	INIMIGO = "INIMIGO",
-	JOGADOR = "JOGADOR"
+	JOGADOR = "JOGADOR",
+	ESPADA = "ESPADA"
 }
 
 objetos = {}
@@ -119,13 +124,13 @@ function atualizaInimigo(inimigo)
 			deltaX = 0
 		}
 		if jogador.y > inimigo.y then
-			delta.deltaY = 0.5
+			delta.deltaY = 1
 			inimigo.direcao = Constantes.Direcao.BAIXO
 		elseif jogador.y < inimigo.y then
-		 	delta.deltaY = -0.5
+		 	delta.deltaY = -1
 			inimigo.direcao = Constantes.Direcao.CIMA
 		end
-		tentaMoverPara(inimigo, delta)
+		tentaMoverPara(inimigo, delta, inimigo.direcao)
 	
 		delta = {
 			deltaY = 0,
@@ -133,14 +138,14 @@ function atualizaInimigo(inimigo)
 		}
 			
 		if jogador.x > inimigo.x then
-			delta.deltaX = 0.5
+			delta.deltaX = 1
 			inimigo.direcao = Constantes.Direcao.DIREITA
 		elseif jogador.x < inimigo.x then
-			delta.deltaX = -0.5
+			delta.deltaX = -1
 			inimigo.direcao = Constantes.Direcao.ESQUERDA
 		end
 		
-		tentaMoverPara(inimigo, delta)
+		tentaMoverPara(inimigo, delta, inimigo.direcao)
 		
 		local AnimacaoInimigo = {
 			{288, 290},
@@ -157,17 +162,48 @@ function atualizaInimigo(inimigo)
 end
 
 function atualizaEspada()
-	if jogador.direcao == Constantes.Direcao.DIREITA then
-		jogador.espada.visivel = true
-		jogador.espada.x = jogador.x + 16
-		jogador.espada.y = jogador.y
-		jogador.espada.tempoParaDesaparecer = 15
+	
+	local DadosDaEspada = {
+		{x = 0, y = -16, sprite = 324},
+		{x = 0, y = 16, sprite = 332},
+		{x = -16, y = 0, sprite = 320},
+		{x = 16, y = 0, sprite = 328}
+	}
+	
+	if jogador.direcao then
+		local direcao = DadosDaEspada[jogador.direcao]
+		jogador.espada.x = jogador.x + direcao.x
+		jogador.espada.y = jogador.y + direcao.y
+		jogador.espada.sprite = direcao.sprite	
+	end
+	
+	if btn(4) and jogador.direcao then
+			local direcao = DadosDaEspada[jogador.direcao]
+			jogador.espada.visivel = true
+			jogador.espada.sprite = direcao.sprite
+			jogador.espada.tempoParaDesaparecer = 15	
+			
+			sfx(
+				Constantes.ID_SFX_ESPADA,
+				86,
+				15,
+				0,
+				8,
+				2)
+	end
+	
+	if jogador.espada.visivel == true then
+		verificaColisaoComObjetos(jogador.espada, jogador.espada)
+		jogador.espada.tempoParaDesaparecer = jogador.espada.tempoParaDesaparecer -1
+		if jogador.espada.tempoParaDesaparecer <= 0 then
+			jogador.espada.visivel = false
+		end
 	end
 end
 
 function atualizaOJogo()
 
-		local Direcao = {
+		local DirecaoDoJogador = {
 		 {deltaX = 0, deltaY = -1},
 			{deltaX = 0, deltaY = 1},
 			{deltaX = -1, deltaY = 0},
@@ -189,19 +225,11 @@ function atualizaOJogo()
 				local quadro = math.floor(jogador.quadroDeAnimacao) 
 				jogador.sprite = quadros[quadro]
 				
-				tentaMoverPara(jogador, Direcao[direcao], direcao)
+				tentaMoverPara(jogador, DirecaoDoJogador[direcao], direcao)
 			end
 		end
 		
-		if btn(4) then
-			atualizaEspada()			
-		end
-		jogador.espada.tempoParaDesaparecer = jogador.espada.tempoParaDesaparecer -1
-		if jogador.espada.tempoParaDesaparecer <= 0 then
-			jogador.espada.visivel = false
-		end
-		
-		
+		atualizaEspada()
 		
 		verificaColisaoComObjetos(jogador, {x = jogador.x, y = jogador.y})
 		
@@ -225,8 +253,7 @@ function desenhaMapa()
 					Constantes.LARGURA_DA_TELA, -- quanto desenhar x
 					Constantes.ALTURA_DA_TELA, -- quanto desenhar y
 					0, -- em qual ponto colocar o x
-					0) -- em qual ponto colocar o y
-	print(jogador.x, 0 , 16) 		
+					0) -- em qual ponto colocar o y 		
 end
 
 function desenhaJogador()
@@ -261,8 +288,8 @@ end
 function desenhaOJogo()
 	cls()
 	desenhaMapa()
-	desenhaJogador()
 	desenhaObjetos()
+	desenhaJogador()
 end
 
 function fazColisaoDoJogadorComAChave(indice)
@@ -316,7 +343,8 @@ function fazColisaoDoJogadorComAPorta(indice)
 end
 
 function fazColisaoDoJogadorComOInimigo(indice)
-	inicializa()
+	inicializaAsVariaveis()
+	tela = Tela.INICIO
 	return true
 end
 
@@ -365,12 +393,23 @@ function atualizaATelaDeTitulo()
 						8,
 						0
 		)
-		tela = Tela.JOGO
+	 mudaParaTela(Tela.JOGO)
 	end
 end
 
 function TIC()
-		tela.atualiza()
+		if proximaTela then
+			if tempoParaMudarATela > 0 then
+				tempoParaMudarATela = tempoParaMudarATela - 1
+			end
+			if tempoParaMudarATela == 0 then
+				tela = proximaTela
+				proximaTela = nil
+			end
+		else 
+			tela.atualiza()	
+		end
+		
 		tela.desenha()
 end
 
@@ -387,7 +426,8 @@ function criaChave(coluna, linha)
 		visivel = true,
 		colisoes = {
 			INIMIGO = deixaPassar,
-			JOGADOR = fazColisaoDoJogadorComAChave
+			JOGADOR = fazColisaoDoJogadorComAChave,
+			ESPADA = deixaPassar
 		}
 	}
 	return chave
@@ -406,10 +446,16 @@ function criaPorta(coluna, linha)
 		visivel = true,
 		colisoes = {
 			INIMIGO = fazColisaoDoInimigoComAPorta, 
-			JOGADOR = fazColisaoDoJogadorComAPorta
+			JOGADOR = fazColisaoDoJogadorComAPorta,
+			ESPADA = deixaPassar
 		}
 	}
 	return porta
+end
+
+function fazColisaoDaEspadaComOInimigo(indice)
+ table.remove(objetos, indice)
+ return false
 end
 
 function criaInimigo(coluna, linha)
@@ -424,11 +470,30 @@ function criaInimigo(coluna, linha)
 		visivel = true,
 		colisoes = {
 			INIMIGO = deixaPassar, 
-			JOGADOR = fazColisaoDoJogadorComOInimigo
+			JOGADOR = fazColisaoDoJogadorComOInimigo,
+			ESPADA = fazColisaoDaEspadaComOInimigo
 		}
 	}
 	
 	return inimigo
+end
+
+function mudaParaTela(novaTela)
+	tempoParaMudarATela = Constantes.TEMPO_PARA_MUDAR_A_TELA
+	proximaTela = novaTela
+end
+
+function atualizaFinal()
+	if btn(4) then
+		inicializaAsVariaveis()
+		mudaParaTela(Tela.INICIO)
+	end
+end
+function desenhaOFinal()
+	cls()
+	
+	print("Voce conseguiu escapar", 56, 40)
+	print("Pressione Z para reiniciar", 48, 86)
 end
 
 Tela = {
@@ -439,10 +504,25 @@ Tela = {
 	JOGO = {
 		atualiza = atualizaOJogo,
 		desenha = desenhaOJogo
+	},
+	FINAL = {
+		atualiza = atualizaFinal,
+		desenha = desenhaOFinal
 	}
 }
 
-function inicializa()
+function chegaNoFinal()
+	sfx(Constantes.ID_SFX_FINAL,
+					36,
+					32,
+					0,
+					8,
+					0)
+	
+	mudaParaTela(Tela.FINAL)	
+end
+
+function inicializaAsVariaveis()
 
 	objetos = {}
 	
@@ -452,27 +532,31 @@ function inicializa()
 	local chave2 = criaChave(23,25)
 	table.insert(objetos, chave2)
 	
-	local porta = criaPorta(18,8)
+	local porta = criaPorta(17,7)
 	table.insert(objetos, porta)
 	
-	local porta2 = criaPorta(54,8)
+	local porta2 = criaPorta(48,13)
 	table.insert(objetos, porta2)
 	
-	local inimigo = criaInimigo(21,13)
-	table.insert(objetos, inimigo)
-	
-	local inimigo2 = criaInimigo(44,8)
-	table.insert(objetos, inimigo2)
+	table.insert(objetos, criaInimigo(20,13))
+	table.insert(objetos, criaInimigo(44,8))
+	table.insert(objetos, criaInimigo(11,21))
+	table.insert(objetos, criaInimigo(5,2))
+	table.insert(objetos, criaInimigo(2,13))
+	table.insert(objetos, criaInimigo(26,7))
 	
 	local espada = {
-		sprite = Constantes.SPRITE_ESPADA,
+		
+		tipo = Constantes.ESPADA,
 		x = 0 + 8,
 		y = 0 + 8,
 		corDeFundo = 0, 
 		visivel = false,
+		tempoParaDesaparecer = 0,
 		colisoes = {
 			INIMIGO = deixaPassar,
-			JOGADOR = deixaPassar
+			JOGADOR = deixaPassar,
+			ESPADA = deixaPassar,
 		}
 	}
 	table.insert(objetos, espada)
@@ -480,15 +564,27 @@ function inicializa()
 	jogador = {
 		tipo = Constantes.JOGADOR,
 		sprite = 260, -- sprite do jogador
-		x = 120, -- posicao x
-		y = 68, -- posicao y
+		x = 13 * 8 + 8, -- posicao x
+		y = 1 * 8 + 8, -- posicao y
 		corDeFundo = 6,
 		quadroDeAnimacao = 1,
 		chaves = 0,
 		espada = espada
 	} 
 	
-	tela = Tela.INICIO
+	local posicaoDaSaida = {
+		sprite = Constantes.SPRITE_SAIDA,
+		x = 55 * 8 + 8, 
+		y = 7 * 8 + 8,
+		corDeFundo = 1,
+		visivel = true,
+		colisoes = {
+		 INIMIGO = deixaPassar,
+			JOGADOR = chegaNoFinal,
+			ESPADA = deixaPassar
+		}
+	}
+	table.insert(objetos, posicaoDaSaida)
 	
 	camera = {
 		x = 0,
@@ -498,4 +594,5 @@ function inicializa()
 	
 end
 
-inicializa()
+tela = Tela.INICIO
+inicializaAsVariaveis()
